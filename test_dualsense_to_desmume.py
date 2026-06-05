@@ -1,7 +1,7 @@
 import unittest
 import os
 import tempfile
-from dualsense_to_desmume import generate_config_dict, update_ini_file, DEFAULT_MAPPINGS
+from dualsense_to_desmume import generate_config_dict, update_ini_file, DEFAULT_MAPPINGS, find_desmume_ini
 
 class TestDualSenseToDesmume(unittest.TestCase):
 
@@ -38,8 +38,9 @@ class TestDualSenseToDesmume(unittest.TestCase):
 
         try:
             new_config = {"Joypad1.A": "0x4002", "Joypad1.B": "0x4001"}
-            success = update_ini_file(tmp_path, new_config, joystick_index=0)
+            success, msg = update_ini_file(tmp_path, new_config, joystick_index=0)
             self.assertTrue(success)
+            self.assertIn("Successfully updated", msg)
 
             with open(tmp_path, 'r') as f:
                 content = f.read()
@@ -66,7 +67,7 @@ class TestDualSenseToDesmume(unittest.TestCase):
 
         try:
             new_config = {"Joypad2.A": "0x8002"}
-            success = update_ini_file(tmp_path, new_config, joystick_index=1)
+            success, msg = update_ini_file(tmp_path, new_config, joystick_index=1)
             self.assertTrue(success)
 
             with open(tmp_path, 'r') as f:
@@ -80,6 +81,25 @@ class TestDualSenseToDesmume(unittest.TestCase):
                 os.remove(tmp_path)
             if os.path.exists(tmp_path + ".bak"):
                 os.remove(tmp_path + ".bak")
+
+    def test_find_desmume_ini(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ini_path = os.path.join(tmpdir, "desmume.ini")
+            with open(ini_path, 'w') as f:
+                f.write("[Joypad]")
+
+            # Test finding it with explicit exe_path hint
+            found = find_desmume_ini(os.path.join(tmpdir, "desmume.exe"))
+            self.assertEqual(found, ini_path)
+
+            # Test finding it when in current directory
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                found = find_desmume_ini()
+                self.assertEqual(os.path.abspath(found), os.path.abspath(ini_path))
+            finally:
+                os.chdir(old_cwd)
 
 if __name__ == '__main__':
     unittest.main()

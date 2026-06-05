@@ -1,44 +1,48 @@
 # DeSmuME PS5 DualSense Setup Tool
 
-This tool helps you configure your PS5 DualSense controller for the DeSmuME DS emulator. It generates the correct hex codes for button mappings and can automatically update your `desmume.ini` file.
+This tool helps you configure your PS5 DualSense controller for the DeSmuME DS emulator. It provides a user-friendly Graphical User Interface (GUI) to map buttons and can automatically sync with your `desmume.ini` file.
 
 ## Features
+- **User-Friendly GUI**: Easy-to-use interface for selecting controllers and INI files.
+- **Real-Time Visual Feedback**: See your controller inputs live in the tool (requires `pygame`).
+- **Process Detection**: Automatically detects if DeSmuME is running and helps locate its configuration file.
 - **PS5 DualSense Optimized**: Pre-configured mappings for standard DualSense buttons.
-- **Multiple Controllers**: Support for different joystick indices if you have multiple controllers. Automatically maps to `Joypad1`, `Joypad2`, etc.
-- **Test Mode**: Real-time feedback of DeSmuME hex codes when you press buttons on your controller (requires `pygame`).
+- **Multiple Controllers**: Support for different joystick indices (Player 1, 2, 3, or 4).
 - **Safe Auto-Update**: Automatically updates your `desmume.ini` without wiping out other players' configurations. A backup is created just in case.
 
 ## Prerequisites
 - Python 3.x
-- `pygame` (optional, only needed for **Test Mode**)
-  ```bash
-  pip install pygame
-  ```
+- `pygame` (recommended for visual feedback)
+- `psutil` (recommended for DeSmuME detection)
+
+Install dependencies:
+```bash
+pip install pygame psutil
+```
 
 ## Usage
 
-### 1. Generate Configuration
-Run the script to see the recommended `[Joypad]` section:
+### 1. Graphical Interface (Default)
+Simply run the script without any arguments to launch the GUI:
 ```bash
 python3 dualsense_to_desmume.py
 ```
+- The tool will attempt to auto-detect your `desmume.ini` and any connected controllers.
+- Use the **Browse** button if the INI file isn't found automatically.
+- Press **Apply Configuration** to save the mappings to DeSmuME.
 
-### 2. Auto-Update desmume.ini
-If you know the path to your `desmume.ini`, the tool can update it for you:
-```bash
-python3 dualsense_to_desmume.py --ini "C:\Path\To\DeSmuME\desmume.ini"
-```
-You can also specify which player slot to update (e.g., Player 2):
-```bash
-python3 dualsense_to_desmume.py --ini "C:\Path\To\DeSmuME\desmume.ini" --index 1
-```
+### 2. Auto-Detect & Sync
+If DeSmuME is running when you open the tool, it will notify you and try to use the correct INI file path immediately.
 
-### 3. Test Mode (Debugging)
-If buttons aren't mapping correctly, use Test Mode to find the exact hex codes for your controller:
+### 3. Command Line Mode (CLI)
+For automation or terminal usage, you can still use the CLI:
 ```bash
-python3 dualsense_to_desmume.py --test
+python3 dualsense_to_desmume.py --cli --ini "C:\Path\To\DeSmuME\desmume.ini"
 ```
-Press buttons on your controller, and the script will print the corresponding `0x4XXX` codes to use in the INI.
+Other CLI options:
+- `--index <0-3>`: Specify player slot (0 for P1, 1 for P2, etc.)
+- `--test`: Run in terminal-based test mode.
+- `--ini <path>`: Directly update a specific INI file.
 
 ## Default Button Mappings
 | PS5 Button | DeSmuME/DS Button |
@@ -56,6 +60,6 @@ Press buttons on your controller, and the script will print the corresponding `0
 | R2         | Boost (Fast Forward) |
 
 ## Troubleshooting
-- **Joystick Index**: If the script doesn't detect the right controller, try `--index 1` or other numbers.
-- **Windows vs Linux**: This tool is primarily designed for the Windows version of DeSmuME which uses DirectInput hex codes in its `.ini` file.
+- **Linux/X11**: If running on Linux, ensure you have a display environment available for the GUI.
+- **DeSmuME Overwriting**: If DeSmuME is running, it may overwrite the `desmume.ini` when it closes. The tool will warn you about this. It's best to close DeSmuME, apply the config, and then restart it.
 - **Permissions**: Ensure you have write access to the `desmume.ini` file.
