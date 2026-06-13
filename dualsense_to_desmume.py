@@ -115,14 +115,17 @@ def update_ini_file(ini_path, new_config_dict, joystick_index=0):
         
         for line in lines:
             stripped = line.strip()
-            if stripped == "[Joypad]":
+            # Check for section header with case-insensitivity and ignore comments
+            clean_line = stripped.split(';')[0].strip().lower()
+
+            if clean_line == "[joypad]":
                 joypad_found = True
                 in_joypad_section = True
                 new_lines.append(line)
                 continue
 
             if in_joypad_section:
-                if stripped.startswith("["):
+                if clean_line.startswith("["):
                     for k, v in new_config_dict.items():
                         if k not in applied_keys:
                             new_lines.append(f"{k}={v}\n")
@@ -219,6 +222,9 @@ class DualSenseGui:
 
         self.sync_btn = ttk.Button(sidebar, text="SYNC", style="Sync.TButton", command=self.apply_config)
         self.sync_btn.pack(fill=tk.X, padx=20, pady=5)
+
+        self.reset_btn = ttk.Button(sidebar, text="RESET", command=self.reset_defaults)
+        self.reset_btn.pack(fill=tk.X, padx=20, pady=5)
 
         ttk.Label(sidebar, text="DEVICES", style="Sidebar.TLabel", padding=(20, 30, 20, 5)).pack(anchor="w")
         self.joy_idx_var = tk.IntVar(value=0)
@@ -364,6 +370,11 @@ class DualSenseGui:
         if success: messagebox.showinfo("Sync", msg)
         else: messagebox.showerror("Error", msg)
 
+    def reset_defaults(self):
+        if messagebox.askyesno("Reset", "Are you sure you want to reset all mappings to defaults?"):
+            self.mappings = DEFAULT_MAPPINGS.copy()
+            self.status_var.set("Reset to default mappings")
+
     def update_loop(self):
         if not pygame: return
         pygame.event.pump()
@@ -382,7 +393,11 @@ class DualSenseGui:
                     self.stop_listening()
                 elif event.type == pygame.JOYHATMOTION and event.value != (0, 0):
                     v = event.value
-                    h = 0x4100 if v == (0, 1) else 0x4101 if v == (1, 0) else 0x4102 if v == (0, -1) else 0x4103
+                    # Handle diagonals by picking the first matching cardinal direction
+                    if v[1] == 1: h = 0x4100    # Up
+                    elif v[0] == 1: h = 0x4101  # Right
+                    elif v[1] == -1: h = 0x4102 # Down
+                    else: h = 0x4103            # Left
                     self.mappings[self.listening_for] = hex(h)
                     self.stop_listening()
 
@@ -435,7 +450,10 @@ def run_test_mode(joystick_index=0):
                     print(f"Button {event.button} -> {hex(base | event.button)}")
                 elif event.type == pygame.JOYHATMOTION and event.value != (0, 0):
                     v = event.value
-                    d = 0 if v == (0, 1) else 1 if v == (1, 0) else 2 if v == (0, -1) else 3
+                    if v[1] == 1: d = 0    # Up
+                    elif v[0] == 1: d = 1  # Right
+                    elif v[1] == -1: d = 2 # Down
+                    else: d = 3            # Left
                     print(f"Hat -> {hex(base | 0x0100 | d)}")
             time.sleep(0.01)
     except KeyboardInterrupt:

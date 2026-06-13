@@ -96,5 +96,38 @@ class TestDualSenseToDesmume(unittest.TestCase):
             if os.path.exists(dummy_ini):
                 os.remove(dummy_ini)
 
+    def test_update_ini_file_case_insensitive(self):
+        initial_content = "[joypad]\nJoypad1.A=0x1234\n"
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
+            tmp.write(initial_content)
+            tmp_path = tmp.name
+        try:
+            new_config = {"Joypad1.A": "0x4002"}
+            success, _ = update_ini_file(tmp_path, new_config, joystick_index=0)
+            self.assertTrue(success)
+            with open(tmp_path, 'r') as f:
+                content = f.read()
+            self.assertIn("Joypad1.A=0x4002", content)
+        finally:
+            if os.path.exists(tmp_path): os.remove(tmp_path)
+            if os.path.exists(tmp_path + ".bak"): os.remove(tmp_path + ".bak")
+
+    def test_update_ini_file_with_comments(self):
+        initial_content = "[Joypad] ; controller settings\nJoypad1.A=0x1234\n"
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
+            tmp.write(initial_content)
+            tmp_path = tmp.name
+        try:
+            new_config = {"Joypad1.A": "0x4002"}
+            success, _ = update_ini_file(tmp_path, new_config, joystick_index=0)
+            self.assertTrue(success)
+            with open(tmp_path, 'r') as f:
+                content = f.read()
+            self.assertIn("Joypad1.A=0x4002", content)
+            self.assertIn("[Joypad] ; controller settings", content)
+        finally:
+            if os.path.exists(tmp_path): os.remove(tmp_path)
+            if os.path.exists(tmp_path + ".bak"): os.remove(tmp_path + ".bak")
+
 if __name__ == '__main__':
     unittest.main()
