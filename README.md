@@ -3,6 +3,9 @@
 This tool helps you configure your PS5 DualSense controller for the DeSmuME DS emulator. It generates the correct hex codes for button mappings and can automatically update your `desmume.ini` file.
 
 ## Features
+- **Graphical User Interface (GUI)**: Easy-to-use interface for mapping buttons and managing configuration.
+- **Interactive Mapping**: Click a button field in the GUI and press your controller button to map it instantly.
+- **Auto-Discovery**: Automatically finds your `desmume.ini` file if DeSmuME is running or in common locations.
 - **PS5 DualSense Optimized**: Pre-configured mappings for standard DualSense buttons.
 - **Multiple Controllers**: Support for different joystick indices if you have multiple controllers. Automatically maps to `Joypad1`, `Joypad2`, etc.
 - **Test Mode**: Real-time feedback of DeSmuME hex codes when you press buttons on your controller (requires `pygame`).
@@ -10,21 +13,28 @@ This tool helps you configure your PS5 DualSense controller for the DeSmuME DS e
 
 ## Prerequisites
 - Python 3.x
-- `pygame` (optional, only needed for **Test Mode**)
+- `pygame` (required for **GUI** and **Test Mode**)
+- `psutil` (optional, for **Auto-Discovery**)
   ```bash
-  pip install pygame
+  pip install pygame psutil
   ```
 
 ## Usage
 
-### 1. Generate Configuration
-Run the script to see the recommended `[Joypad]` section:
+### 1. Launch GUI (Recommended)
+Simply run the script without arguments to start the interactive setup:
 ```bash
 python3 dualsense_to_desmume.py
 ```
 
-### 2. Auto-Update desmume.ini
-If you know the path to your `desmume.ini`, the tool can update it for you:
+### 2. CLI Mode: Generate Configuration
+Run the script with `--cli` to see the recommended `[Joypad]` section in the terminal:
+```bash
+python3 dualsense_to_desmume.py --cli
+```
+
+### 3. CLI Mode: Auto-Update desmume.ini
+If you know the path to your `desmume.ini`, the tool can update it for you via CLI:
 ```bash
 python3 dualsense_to_desmume.py --ini "C:\Path\To\DeSmuME\desmume.ini"
 ```

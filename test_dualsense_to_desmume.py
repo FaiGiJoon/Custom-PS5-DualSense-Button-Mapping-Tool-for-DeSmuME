@@ -1,7 +1,7 @@
 import unittest
 import os
 import tempfile
-from dualsense_to_desmume import generate_config_dict, update_ini_file, DEFAULT_MAPPINGS
+from dualsense_to_desmume import generate_config_dict, update_ini_file, DEFAULT_MAPPINGS, find_desmume_ini
 
 class TestDualSenseToDesmume(unittest.TestCase):
 
@@ -38,8 +38,9 @@ class TestDualSenseToDesmume(unittest.TestCase):
 
         try:
             new_config = {"Joypad1.A": "0x4002", "Joypad1.B": "0x4001"}
-            success = update_ini_file(tmp_path, new_config, joystick_index=0)
+            success, message = update_ini_file(tmp_path, new_config, joystick_index=0)
             self.assertTrue(success)
+            self.assertIn("Successfully updated", message)
 
             with open(tmp_path, 'r') as f:
                 content = f.read()
@@ -66,7 +67,7 @@ class TestDualSenseToDesmume(unittest.TestCase):
 
         try:
             new_config = {"Joypad2.A": "0x8002"}
-            success = update_ini_file(tmp_path, new_config, joystick_index=1)
+            success, message = update_ini_file(tmp_path, new_config, joystick_index=1)
             self.assertTrue(success)
 
             with open(tmp_path, 'r') as f:
@@ -80,6 +81,20 @@ class TestDualSenseToDesmume(unittest.TestCase):
                 os.remove(tmp_path)
             if os.path.exists(tmp_path + ".bak"):
                 os.remove(tmp_path + ".bak")
+
+    def test_find_desmume_ini(self):
+        # Create a dummy ini in current dir
+        dummy_ini = "desmume.ini"
+        with open(dummy_ini, "w") as f:
+            f.write("[Joypad]")
+
+        try:
+            found = find_desmume_ini()
+            self.assertIsNotNone(found)
+            self.assertTrue(found.endswith("desmume.ini"))
+        finally:
+            if os.path.exists(dummy_ini):
+                os.remove(dummy_ini)
 
 if __name__ == '__main__':
     unittest.main()
