@@ -60,9 +60,13 @@ def generate_config_dict(mappings, joystick_index=0):
 
         if isinstance(val, str) and val.startswith("0x"):
             orig_val = int(val, 16)
-            if orig_val >= 0x4100:
+            if orig_val >= 0x4300: # Axis Negative
+                new_val = base_button | 0x0300 | (orig_val & 0xFF)
+            elif orig_val >= 0x4200: # Axis Positive
+                new_val = base_button | 0x0200 | (orig_val & 0xFF)
+            elif orig_val >= 0x4100: # Hat
                 new_val = base_hat | (orig_val & 0xFF)
-            else:
+            else: # Button
                 new_val = base_button | (orig_val & 0xFF)
             result[config_key] = hex(new_val).upper().replace('X', 'x')
         else:
@@ -86,10 +90,24 @@ def find_desmume_ini():
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 pass
 
-    for d in [".", ".."]:
+    search_dirs = [".", ".."]
+
+    # Common Windows locations
+    appdata = os.environ.get('APPDATA')
+    if appdata:
+        search_dirs.append(os.path.join(appdata, "DeSmuME"))
+
+    userprofile = os.environ.get('USERPROFILE') or os.path.expanduser("~")
+    if userprofile:
+        search_dirs.append(os.path.join(userprofile, "Documents", "DeSmuME"))
+        search_dirs.append(os.path.join(userprofile, "Desktop", "DeSmuME"))
+        search_dirs.append(userprofile)
+
+    for d in search_dirs:
         p = os.path.join(d, "desmume.ini")
         if os.path.exists(p):
             return os.path.abspath(p)
+
     return None
 
 def update_ini_file(ini_path, new_config_dict, joystick_index=0):
@@ -171,6 +189,7 @@ class DualSenseGui:
         self.mappings = DEFAULT_MAPPINGS.copy()
         self.listening_for = None
         self.record_sequence = []
+        self.joysticks = []
 
         self.setup_ui()
         self.init_pygame()
@@ -221,11 +240,10 @@ class DualSenseGui:
         self.sync_btn.pack(fill=tk.X, padx=20, pady=5)
 
         ttk.Label(sidebar, text="DEVICES", style="Sidebar.TLabel", padding=(20, 30, 20, 5)).pack(anchor="w")
-        self.joy_idx_var = tk.IntVar(value=0)
-        self.joy_spin = tk.Spinbox(sidebar, from_=0, to=10, textvariable=self.joy_idx_var,
-                                   command=self.on_joy_change, bg="#333333", fg="white",
-                                   insertbackground="white", buttonbackground="#444444", width=5)
-        self.joy_spin.pack(fill=tk.X, padx=20, pady=5)
+        self.joy_idx_var = tk.StringVar(value="0")
+        self.joy_combo = ttk.Combobox(sidebar, textvariable=self.joy_idx_var, state="readonly")
+        self.joy_combo.bind("<<ComboboxSelected>>", lambda e: self.on_joy_change())
+        self.joy_combo.pack(fill=tk.X, padx=20, pady=5)
 
         ttk.Label(sidebar, text="CONFIG", style="Sidebar.TLabel", padding=(20, 20, 20, 5)).pack(anchor="w")
         self.ini_path_var = tk.StringVar()
@@ -292,6 +310,9 @@ class DualSenseGui:
         ttk.Label(sticks_container, text="R-STICK").place(in_=self.rstick_canvas, relx=0.5, rely=0.9, anchor="n")
 
         # Status
+        self.last_input_var = tk.StringVar(value="Last Input: None")
+        ttk.Label(main_content, textvariable=self.last_input_var, font=("Segoe UI", 9)).pack(side=tk.BOTTOM, fill=tk.X, pady=(10, 0))
+
         self.status_var = tk.StringVar(value="Ready")
         ttk.Label(main_content, textvariable=self.status_var, font=("Segoe UI", 9, "italic")).pack(side=tk.BOTTOM, fill=tk.X)
 
@@ -317,13 +338,43 @@ class DualSenseGui:
         if not pygame: return
         pygame.joystick.quit()
         pygame.joystick.init()
-        idx = self.joy_idx_var.get()
-        if pygame.joystick.get_count() > idx:
+
+        count = pygame.joystick.get_count()
+        self.joysticks = []
+        combo_values = []
+
+        for i in range(count):
+            try:
+                js = pygame.joystick.Joystick(i)
+                js.init()
+                name = js.get_name()
+                self.joysticks.append(js)
+                combo_values.append(f"{i}: {name}")
+            except pygame.error:
+                pass
+
+        self.joy_combo['values'] = combo_values
+
+        selected = self.joy_idx_var.get()
+        idx = 0
+        try:
+            if ":" in selected:
+                idx = int(selected.split(":")[0])
+            else:
+                idx = int(selected)
+        except (ValueError, IndexError):
+            idx = 0
+
+        if count > idx:
             js = pygame.joystick.Joystick(idx)
             js.init()
             self.joy_name_var.set(f"Connected: {js.get_name()}")
+            self.joy_combo.current(idx)
         else:
-            self.joy_name_var.set("No controller at this index")
+            self.joy_name_var.set("No controller connected" if count == 0 else "Select a controller")
+            if count > 0:
+                self.joy_combo.current(0)
+                self.on_joy_change()
 
     def on_joy_change(self):
         self.refresh_joystick()
@@ -356,9 +407,18 @@ class DualSenseGui:
         else:
             self.status_var.set("Recording complete")
 
+    def get_joy_idx(self):
+        val = self.joy_idx_var.get()
+        try:
+            if ":" in val:
+                return int(val.split(":")[0])
+            return int(val)
+        except (ValueError, IndexError):
+            return 0
+
     def apply_config(self):
         ini_path = self.ini_path_var.get()
-        idx = self.joy_idx_var.get()
+        idx = self.get_joy_idx()
         config_dict = generate_config_dict(self.mappings, idx)
         success, msg = update_ini_file(ini_path, config_dict, idx)
         if success: messagebox.showinfo("Sync", msg)
@@ -366,9 +426,8 @@ class DualSenseGui:
 
     def update_loop(self):
         if not pygame: return
-        pygame.event.pump()
 
-        idx = self.joy_idx_var.get()
+        idx = self.get_joy_idx()
         js = None
         if pygame.joystick.get_count() > idx:
             js = pygame.joystick.Joystick(idx)
@@ -376,6 +435,29 @@ class DualSenseGui:
 
         # Input Events
         for event in pygame.event.get():
+            if event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
+                self.refresh_joystick()
+                continue
+
+            # Auto-detect logic
+            detected_idx = -1
+            if event.type == pygame.JOYBUTTONDOWN:
+                detected_idx = event.joy
+                self.last_input_var.set(f"Last Input: Button {event.button} (Joy {event.joy})")
+            elif event.type == pygame.JOYHATMOTION and event.value != (0, 0):
+                detected_idx = event.joy
+                self.last_input_var.set(f"Last Input: Hat {event.hat} {event.value} (Joy {event.joy})")
+            elif event.type == pygame.JOYAXISMOTION and abs(event.value) > 0.5:
+                detected_idx = event.joy
+                self.last_input_var.set(f"Last Input: Axis {event.axis} {'+' if event.value > 0 else '-'} (Joy {event.joy})")
+
+            if detected_idx != -1 and detected_idx != idx:
+                self.joy_combo.current(detected_idx)
+                self.on_joy_change()
+                idx = detected_idx
+                js = pygame.joystick.Joystick(idx)
+                if not js.get_init(): js.init()
+
             if self.listening_for:
                 if event.type == pygame.JOYBUTTONDOWN:
                     self.mappings[self.listening_for] = hex(0x4000 | event.button)
@@ -384,6 +466,10 @@ class DualSenseGui:
                     v = event.value
                     h = 0x4100 if v == (0, 1) else 0x4101 if v == (1, 0) else 0x4102 if v == (0, -1) else 0x4103
                     self.mappings[self.listening_for] = hex(h)
+                    self.stop_listening()
+                elif event.type == pygame.JOYAXISMOTION and abs(event.value) > 0.5:
+                    prefix = 0x4200 if event.value > 0 else 0x4300
+                    self.mappings[self.listening_for] = hex(prefix | event.axis)
                     self.stop_listening()
 
         # Visual Feedback
@@ -397,6 +483,14 @@ class DualSenseGui:
                         hv = js.get_hat(0)
                         d = code & 0xFF
                         if (d==0 and hv[1]==1) or (d==1 and hv[0]==1) or (d==2 and hv[1]==-1) or (d==3 and hv[0]==-1):
+                            pressed = True
+                    elif code >= 0x4300: # Axis Negative
+                        aid = code & 0xFF
+                        if aid < js.get_numaxes() and js.get_axis(aid) < -0.5:
+                            pressed = True
+                    elif code >= 0x4200: # Axis Positive
+                        aid = code & 0xFF
+                        if aid < js.get_numaxes() and js.get_axis(aid) > 0.5:
                             pressed = True
                     else: # Button
                         bid = code & 0xFF

@@ -82,6 +82,23 @@ class TestDualSenseToDesmume(unittest.TestCase):
             if os.path.exists(tmp_path + ".bak"):
                 os.remove(tmp_path + ".bak")
 
+    def test_generate_config_dict_axis(self):
+        # Axis 2 Positive -> 0x4202
+        # For Joypad 1 -> 0x4202 (base 0x4000 | 0x0200 | 2)
+        # For Joypad 2 -> 0x8202 (base 0x8000 | 0x0200 | 2)
+        mappings = {"A": "0x4202"}
+        config = generate_config_dict(mappings, joystick_index=0)
+        self.assertEqual(config["Joypad1.A"], "0x4202")
+
+        config2 = generate_config_dict(mappings, joystick_index=1)
+        self.assertEqual(config2["Joypad2.A"], "0x8202")
+
+    def test_generate_config_dict_axis_negative(self):
+        # Axis 2 Negative -> 0x4302
+        mappings = {"B": "0x4302"}
+        config = generate_config_dict(mappings, joystick_index=0)
+        self.assertEqual(config["Joypad1.B"], "0x4302")
+
     def test_find_desmume_ini(self):
         # Create a dummy ini in current dir
         dummy_ini = "desmume.ini"
